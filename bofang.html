@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>M3U8视频播放器</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            position: relative;
+            overflow-x: hidden;
+        }
+        
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: var(--bg-image, url('https://images.unsplash.com/photo-1557683316-973673baf926?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2029&q=80'));
+            background-size: cover;
+            background-position: center;
+            opacity: 0.2;
+            z-index: -1;
+            transition: background-image 0.5s ease;
+        }
+        
+        .container {
+            max-width: 1200px;
+            width: 100%;
+            background: rgba(25, 25, 45, 0.85);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        header {
+            padding: 25px 30px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(to right, #00c6ff, #0072ff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            font-weight: 700;
+        }
+        
+        .subtitle {
+            color: #a0a0c0;
+            font-size: 1.1rem;
+        }
+        
+        .main-content {
+            display: flex;
+            flex-wrap: wrap;
+            padding: 20px;
+            gap: 30px;
+        }
+        
+        .player-section {
+            flex: 1;
+            min-width: 300px;
+        }
+        
+        .controls-section {
+            flex: 1;
+            min-width: 300px;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+        
+        .video-container {
+            position: relative;
+            width: 100%;
+            padding-top: 56.25%; /* 16:9 Aspect Ratio */
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+        
+        #video-player {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            outline: none;
+        }
+        
+        .player-controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(30, 30, 50, 0.7);
+            border-radius: 12px;
+        }
+        
+        .control-btn {
+            background: linear-gradient(135deg, #0072ff, #00c6ff);
+            border: none;
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            font-size: 1.2rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(0, 114, 255, 0.4);
+        }
+        
+        .control-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0, 114, 255, 0.6);
+        }
+        
+        .control-btn:active {
+            transform: translateY(1px);
+        }
+        
+        .volume-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(30, 30, 50, 0.7);
+            padding: 12px 20px;
+            border-radius: 30px;
+            margin-top: 10px;
+        }
+        
+        .volume-control i {
+            font-size: 1.3rem;
+            color: #00c6ff;
+        }
+        
+        #volume-slider {
+            flex: 1;
+            height: 8px;
+            -webkit-appearance: none;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            outline: none;
+        }
+        
+        #volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #00c6ff;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0, 198, 255, 0.7);
+        }
+        
+        .settings-panel {
+            background: rgba(30, 30, 50, 0.7);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .panel-title {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: #00c6ff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .input-group {
+            margin-bottom: 25px;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #a0a0c0;
+            font-weight: 500;
+        }
+        
+        .input-group input {
+            width: 100%;
+            padding: 14px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(20, 20, 40, 0.8);
+            color: white;
+            font-size: 1rem;
+            transition: border 0.3s ease;
+        }
+        
+        .input-group input:focus {
+            outline: none;
+            border: 1px solid #00c6ff;
+            box-shadow: 0 0 10px rgba(0, 198, 255, 0.3);
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #0072ff, #00c6ff);
+            color: white;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(0, 114, 255, 0.4);
+        }
+        
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0, 114, 255, 0.6);
+        }
+        
+        .btn:active {
+            transform: translateY(1px);
+        }
+        
+        .bg-previews {
+            display: flex;
+            gap: 15px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .bg-preview {
+            width: 80px;
+            height: 60px;
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            opacity: 0.7;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+        
+        .bg-preview:hover {
+            opacity: 1;
+            transform: scale(1.05);
+        }
+        
+        .bg-preview.active {
+            opacity: 1;
+            border: 2px solid #00c6ff;
+            box-shadow: 0 0 15px rgba(0, 198, 255, 0.7);
+        }
+        
+        .bg-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .progress-container {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.1);
+            height: 8px;
+            border-radius: 10px;
+            margin-top: 15px;
+            cursor: pointer;
+            overflow: hidden;
+        }
+        
+        #progress-bar {
+            height: 100%;
+            background: linear-gradient(to right, #0072ff, #00c6ff);
+            width: 0%;
+            border-radius: 10px;
+            transition: width 0.1s;
+        }
+        
+        .time-display {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            color: #a0a0c0;
+            font-size: 0.9rem;
+        }
+        
+        .status {
+            text-align: center;
+            padding: 15px;
+            margin-top: 10px;
+            border-radius: 10px;
+            background: rgba(30, 30, 50, 0.7);
+            color: #00c6ff;
+            font-weight: 500;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 25px;
+            color: #a0a0c0;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            margin-top: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
+                flex-direction: column;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .player-controls {
+                flex-wrap: wrap;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-play-circle"></i> M3U8视频播放器</h1>
+            <p class="subtitle">支持HLS流媒体播放 | 自定义背景 | 响应式设计</p>
+        </header>
+        
+        <div class="main-content">
+            <div class="player-section">
+                <div class="video-container">
+                    <video id="video-player" controls></video>
+                </div>
+                
+                <div class="progress-container" id="progress-container">
+                    <div id="progress-bar"></div>
+                </div>
+                <div class="time-display">
+                    <span id="current-time">00:00</span>
+                    <span id="duration">00:00</span>
+                </div>
+                
+                <div class="player-controls">
+                    <button class="control-btn" id="play-btn"><i class="fas fa-play"></i></button>
+                    <button class="control-btn" id="pause-btn"><i class="fas fa-pause"></i></button>
+                    <button class="control-btn" id="stop-btn"><i class="fas fa-stop"></i></button>
+                </div>
+                
+                <div class="volume-control">
+                    <i class="fas fa-volume-up"></i>
+                    <input type="range" id="volume-slider" min="0" max="1" step="0.01" value="1">
+                </div>
+                
+                <div class="status" id="status">
+                    准备就绪，请输入M3U8链接开始播放
+                </div>
+            </div>
+            
+            <div class="controls-section">
+                <div class="settings-panel">
+                    <h2 class="panel-title"><i class="fas fa-wifi"></i> M3U8源设置</h2>
+                    <div class="input-group">
+                        <label for="m3u8-url">M3U8视频源地址</label>
+                        <input type="text" id="m3u8-url" placeholder="https://example.com/video.m3u8" value="https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8">
+                    </div>
+                    <button class="btn" id="load-btn"><i class="fas fa-sync-alt"></i> 加载视频源</button>
+                </div>
+                
+                <div class="settings-panel">
+                    <h2 class="panel-title"><i class="fas fa-image"></i> 背景设置</h2>
+                    <div class="input-group">
+                        <label for="bg-url">自定义背景图片URL</label>
+                        <input type="text" id="bg-url" placeholder="https://example.com/background.jpg">
+                    </div>
+                    <button class="btn" id="bg-apply-btn"><i class="fas fa-check"></i> 应用背景</button>
+                    
+                    <p style="margin-top: 15px; color: #a0a0c0;">预设背景:</p>
+                    <div class="bg-previews">
+                        <div class="bg-preview active" data-url="https://images.unsplash.com/photo-1557683316-973673baf926?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2029&q=80">
+                            <img src="https://images.unsplash.com/photo-1557683316-973673baf926?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&q=80" alt="Abstract">
+                        </div>
+                        <div class="bg-preview" data-url="https://images.unsplash.com/photo-1519681393784-d120267933ba?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80">
+                            <img src="https://images.unsplash.com/photo-1519681393784-d120267933ba?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&q=80" alt="Mountains">
+                        </div>
+                        <div class="bg-preview" data-url="https://images.unsplash.com/photo-1518834107812-67b0b7c58434?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1935&q=80">
+                            <img src="https://images.unsplash.com/photo-1518834107812-67b0b7c58434?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&q=80" alt="Space">
+                        </div>
+                        <div class="bg-preview" data-url="https://images.unsplash.com/photo-1533134486753-c833f0ed4866?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80">
+                            <img src="https://images.unsplash.com/photo-1533134486753-c833f0ed4866?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&q=80" alt="Dark">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            <p>M3U8视频播放器 &copy; 2023 | 基于hls.js构建 | 可在GitHub Pages托管</p>
+        </footer>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 获取DOM元素
+            const video = document.getElementById('video-player');
+            const playBtn = document.getElementById('play-btn');
+            const pauseBtn = document.getElementById('pause-btn');
+            const stopBtn = document.getElementById('stop-btn');
+            const volumeSlider = document.getElementById('volume-slider');
+            const m3u8UrlInput = document.getElementById('m3u8-url');
+            const loadBtn = document.getElementById('load-btn');
+            const bgUrlInput = document.getElementById('bg-url');
+            const bgApplyBtn = document.getElementById('bg-apply-btn');
+            const bgPreviews = document.querySelectorAll('.bg-preview');
+            const progressContainer = document.getElementById('progress-container');
+            const progressBar = document.getElementById('progress-bar');
+            const currentTimeDisplay = document.getElementById('current-time');
+            const durationDisplay = document.getElementById('duration');
+            const statusDisplay = document.getElementById('status');
+            
+            let hls = null;
+            
+            // 初始化HLS播放器
+            function initPlayer(url) {
+                if (hls) {
+                    hls.destroy();
+                }
+                
+                if (Hls.isSupported()) {
+                    hls = new Hls();
+                    hls.loadSource(url);
+                    hls.attachMedia(video);
+                    
+                    hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                        statusDisplay.textContent = "视频源已加载，点击播放按钮开始";
+                        video.volume = volumeSlider.value;
+                        updateDurationDisplay();
+                    });
+                    
+                    hls.on(Hls.Events.ERROR, function(event, data) {
+                        console.error("播放错误:", data);
+                        if (data.fatal) {
+                            switch(data.type) {
+                                case Hls.ErrorTypes.NETWORK_ERROR:
+                                    statusDisplay.textContent = "网络错误: " + data.details;
+                                    break;
+                                case Hls.ErrorTypes.MEDIA_ERROR:
+                                    statusDisplay.textContent = "媒体错误: " + data.details;
+                                    break;
+                                default:
+                                    statusDisplay.textContent = "播放错误: " + data.details;
+                                    break;
+                            }
+                        }
+                    });
+                } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                    // 对于Safari浏览器
+                    video.src = url;
+                    video.addEventListener('loadedmetadata', function() {
+                        statusDisplay.textContent = "视频源已加载，点击播放按钮开始";
+                        video.volume = volumeSlider.value;
+                        updateDurationDisplay();
+                    });
+                } else {
+                    statusDisplay.textContent = "您的浏览器不支持HLS播放";
+                }
+            }
+            
+            // 播放控制
+            playBtn.addEventListener('click', function() {
+                video.play().catch(e => {
+                    statusDisplay.textContent = "播放失败: " + e.message;
+                });
+            });
+            
+            pauseBtn.addEventListener('click', function() {
+                video.pause();
+            });
+            
+            stopBtn.addEventListener('click', function() {
+                video.pause();
+                video.currentTime = 0;
+                progressBar.style.width = '0%';
+                updateCurrentTimeDisplay();
+            });
+            
+            // 音量控制
+            volumeSlider.addEventListener('input', function() {
+                video.volume = volumeSlider.value;
+            });
+            
+            // 加载M3U8源
+            loadBtn.addEventListener('click', function() {
+                const url = m3u8UrlInput.value.trim();
+                if (url) {
+                    statusDisplay.textContent = "正在加载视频源...";
+                    initPlayer(url);
+                } else {
+                    statusDisplay.textContent = "请输入有效的M3U8 URL";
+                }
+            });
+            
+            // 背景设置
+            bgApplyBtn.addEventListener('click', function() {
+                const bgUrl = bgUrlInput.value.trim();
+                if (bgUrl) {
+                    document.body.style.setProperty('--bg-image', `url('${bgUrl}')`);
+                    updateActivePreview(null);
+                    statusDisplay.textContent = "背景已更新";
+                }
+            });
+            
+            // 预设背景
+            bgPreviews.forEach(preview => {
+                preview.addEventListener('click', function() {
+                    const bgUrl = this.dataset.url;
+                    document.body.style.setProperty('--bg-image', `url('${bgUrl}')`);
+                    updateActivePreview(this);
+                    bgUrlInput.value = bgUrl;
+                    statusDisplay.textContent = "背景已更新";
+                });
+            });
+            
+            // 更新激活的背景预览
+            function updateActivePreview(activeElement) {
+                bgPreviews.forEach(preview => {
+                    preview.classList.remove('active');
+                });
+                if (activeElement) {
+                    activeElement.classList.add('active');
+                }
+            }
+            
+            // 进度条控制
+            video.addEventListener('timeupdate', updateProgress);
+            
+            progressContainer.addEventListener('click', function(e) {
+                const pos = (e.pageX - this.getBoundingClientRect().left) / this.offsetWidth;
+                video.currentTime = pos * video.duration;
+            });
+            
+            function updateProgress() {
+                const percent = (video.currentTime / video.duration) * 100;
+                progressBar.style.width = percent + '%';
+                updateCurrentTimeDisplay();
+            }
+            
+            // 时间显示
+            function updateCurrentTimeDisplay() {
+                currentTimeDisplay.textContent = formatTime(video.currentTime);
+            }
+            
+            function updateDurationDisplay() {
+                durationDisplay.textContent = formatTime(video.duration);
+            }
+            
+            function formatTime(seconds) {
+                const mins = Math.floor(seconds / 60);
+                const secs = Math.floor(seconds % 60);
+                return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            }
+            
+            // 初始化默认背景
+            updateActivePreview(document.querySelector('.bg-preview.active'));
+        });
+    </script>
+</body>
+</html>
